@@ -1,0 +1,100 @@
+version: "3.9"
+
+services:
+  # ─── MongoDB ──────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: finflow-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: finflow
+      MONGO_INITDB_ROOT_PASSWORD: finflow_secret
+      MONGO_INITDB_DATABASE: finflow
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - finflow-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Node.js Backend Service ──────────────────────────────
+  service-node:
+    build:
+      context: ./apps/service-node
+      dockerfile: Dockerfile
+    container_name: finflow-service-node
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - MONGODB_URI=mongodb://finflow:finflow_secret@mongodb:27017/finflow?authSource=admin
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - finflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─── Java Spring Boot Service ─────────────────────────────
+  service-java:
+    build:
+      context: ./apps/service-java
+      dockerfile: Dockerfile
+    container_name: finflow-service-java
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_MONGODB_URI=mongodb://finflow:finflow_secret@mongodb:27017/finflow?authSource=admin
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - finflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+  # ─── Next.js Frontend ────────────────────────────────────
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    container_name: finflow-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_NODE_SERVICE_URL=http://service-node:4000
+      - NEXT_PUBLIC_JAVA_SERVICE_URL=http://service-java:8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - service-node
+      - service-java
+    networks:
+      - finflow-net
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  finflow-net:
+    driver: bridge

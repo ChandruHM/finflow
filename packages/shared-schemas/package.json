@@ -1,0 +1,23 @@
+{
+  "name": "finflow-shared-schemas",
+  "version": "1.0.0",
+  "description": "Shared TypeScript/Zod schemas and type definitions for FinFlow",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/ --ext .ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "eslint": "^9.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.5",
+    "@types/jest": "^29.5.12",
+    "typescript": "^5.5.0"
+  }
+}
